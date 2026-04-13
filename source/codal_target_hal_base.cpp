@@ -4,7 +4,12 @@
 #include "CodalCompat.h"
 #include "Timer.h"
 
+#ifndef CONFIG_TARGET_MAX_IRQ
+#define CONFIG_TARGET_MAX_IRQ 48
+#endif
+
 static int8_t irq_disabled;
+static int8_t device_lock[CONFIG_TARGET_MAX_IRQ] = {0};
 
 // codal::Serial is designed by Polling or Interrupt method without considering DMA.
 // In particular, printf forcibly disables interrupts using target_disable_irq(),
@@ -20,18 +25,51 @@ int8_t target_get_irq_disabled()
 
 void target_enable_irq()
 {
-    irq_disabled--;
-    if (irq_disabled <= 0) {
-        irq_disabled = 0;
-        __enable_irq();
+    target_enable_irqn(-1);
+}
+
+void target_enable_irqn(int32_t irqn)
+{
+    if (irqn < 0)
+    {
+        // Use global IRQ lock.
+        irq_disabled--;
+        if (irq_disabled <= 0) {
+            irq_disabled = 0;
+            __enable_irq();
+        }
+    }
+    else
+    {
+        // Use finer grained per-IRQn lock
+        device_lock[irqn]--;
+        if (device_lock[irqn] <= 0) {
+            device_lock[irqn] = 0;
+            NVIC_EnableIRQ((IRQn_Type) irqn);
+        }
     }
 }
 
 void target_disable_irq()
 {
+    target_disable_irqn(-1);
+}
+
+void target_disable_irqn(int32_t irqn)
+{
     // always disable just in case - it's just one instruction
-    __disable_irq();
-    irq_disabled++;
+
+    if (irqn < 0)
+    {
+        __disable_irq();
+        irq_disabled++;
+    }
+    else
+    {
+        NVIC_DisableIRQ((IRQn_Type) irqn);
+        device_lock[irqn]++;
+    }
+
     // this used to disable here, only if irq_disabled==1 - this was a race
 }
 
