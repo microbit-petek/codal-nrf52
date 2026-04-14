@@ -23,7 +23,7 @@ int8_t target_get_irq_disabled()
     return irq_disabled;
 }
 
-void target_enable_irq()
+__attribute__((weak)) void target_enable_irq()
 {
     target_enable_irqn(-1);
 }
@@ -50,7 +50,7 @@ void target_enable_irqn(int32_t irqn)
     }
 }
 
-void target_disable_irq()
+__attribute__((weak)) void target_disable_irq()
 {
     target_disable_irqn(-1);
 }
