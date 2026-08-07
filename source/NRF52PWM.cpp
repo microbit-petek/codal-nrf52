@@ -1,4 +1,5 @@
 #include "NRF52PWM.h"
+#include "ResourceConsumer.h"
 #include "nrf.h"
 #include "cmsis.h"
 
@@ -393,4 +394,27 @@ NRF52PWM::releasePin(Pin &pin)
 int NRF52PWM::disconnectPin(Pin &pin)
 {
     return releasePin(pin);
+}
+
+void NRF52PWM::connect(ResourceConsumer &consumer)
+{
+    if (this->consumer != &consumer)
+    {
+        if (this->consumer != NULL)
+        {
+            disconnect();
+            this->consumer = &consumer;
+        }
+    }
+}
+
+void NRF52PWM::disconnect()
+{
+    if(consumer != NULL && !consumer->isResourceLocked())
+    {
+        disable();
+        upstream.disconnect();
+        consumer->releaseResource(*this);
+        consumer = NULL;
+    }
 }

@@ -1,9 +1,11 @@
 #include "CodalConfig.h"
+#include "ResourceConsumer.h"
 #include "codal-core/inc/types/Event.h"
 #include "Timer.h"
 #include "NRF52Pin.h"
 #include "DataStream.h"
 #include "nrf.h"
+#include "Resource.h"
 
 #ifndef NRF52PWM_H
 #define NRF52PWM_H
@@ -24,7 +26,7 @@ using namespace codal;
 
 namespace codal
 {
-class NRF52PWM : public CodalComponent, public DataSink, public PinPeripheral
+class NRF52PWM : public CodalComponent, public DataSink, public PinPeripheral, public Resource
 {
 
 private:
@@ -152,6 +154,10 @@ public:
     // Backward compat - deprecated.
     int disconnectPin(Pin &pin);
 
+    virtual void connect(ResourceConsumer &consumer) override;
+    
+    virtual void disconnect() override;
+    
     private:
     /**
      * Pull a buffer into the given double buffer slot, if one is available.
