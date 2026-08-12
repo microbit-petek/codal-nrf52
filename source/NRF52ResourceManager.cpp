@@ -31,10 +31,10 @@ NRF52PWM *NRF52ResourceManager::pwmRequest(DataSource &source, NRF_PWM_Type *pwm
                                            float const sampleRate, uint16_t const id)
 {
     uint8_t pwmIndex = 0;
-    NRF52PWM *reallocatablePwm = NULL;
-    // No pwm was specified, attempt to find either a free one or one that isn't locked
+    uint8_t reallocatablePwmIndex = NRF52PWM_PWM_PERIPHERALS;
     if (NULL == pwm)
     {
+        // No pwm was specified, attempt to find either a free one or one that isn't locked
         for (; pwmIndex < NRF52PWM_PWM_PERIPHERALS; ++pwmIndex)
         {
             if (NULL == pwmDrivers[pwmIndex])
@@ -46,23 +46,43 @@ NRF52PWM *NRF52ResourceManager::pwmRequest(DataSource &source, NRF_PWM_Type *pwm
             else if (!pwmDrivers[pwmIndex]->isLocked())
             {
                 // If no unused peripherals are found, an unlocked peripheral is plan B
-                reallocatablePwm = pwmDrivers[pwmIndex];
+                reallocatablePwmIndex = pwmIndex;
+            }
+        }
+    }
+    else
+    {
+        for (; pwmIndex < NRF52PWM_PWM_PERIPHERALS; ++pwmIndex)
+        {
+            if (PWM_IRQ_MAP[pwmIndex].pwm == pwm)
+            {
+                break;
             }
         }
     }
 
     if (NULL == pwm)
     {
-        if (NULL == reallocatablePwm)
+        if (reallocatablePwmIndex >= NRF52PWM_PWM_PERIPHERALS)
         {
             // No peripherals are available, abort
             return NULL;
         }
 
         // No unused peripheral so on to Plan B
-        reallocatablePwm->disconnect();
-        delete reallocatablePwm;
-        pwm = PWM_IRQ_MAP[pwmIndex].pwm;
+        pwm = PWM_IRQ_MAP[reallocatablePwmIndex].pwm;
+        pwmIndex = reallocatablePwmIndex;
+    }
+
+    if (NULL != pwmDrivers[pwmIndex])
+    {
+        if (pwmDrivers[pwmIndex]->isLocked())
+        {
+            // Resource is locked, nothing more we can do
+            return NULL;
+        }
+
+        pwmDrivers[pwmIndex]->disconnect();
     }
 
     NRF52PWM *driver = new NRF52PWM(pwm, source, sampleRate, id);
@@ -80,6 +100,7 @@ void NRF52ResourceManager::pwmRelease(NRF52PWM *&pwm)
             break;
         }
     }
+
     if (pwmIndex >= NRF52PWM_PWM_PERIPHERALS)
     {
         return;
