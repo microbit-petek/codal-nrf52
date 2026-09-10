@@ -25,7 +25,30 @@ DEALINGS IN THE SOFTWARE.
 #ifndef NRF52_RESOURCE_MANAGER
 #define NRF52_RESOURCE_MANAGER
 
+#include "ErrorNo.h"
 #include "NRF52PWM.h"
+#include "Resource.h"
+
+#define GET_RESOURCE(resourceType, instanceNumber, ...)                                            \
+    ({                                                                                             \
+        NRF52##resourceType *resource = NULL;                                                      \
+        NRF52ResourceManager &resourceManager = NRF52ResourceManager::get();                       \
+        if (DEVICE_BUSY != resourceManager.releaseResource(resourceType##instanceNumber))          \
+        {                                                                                          \
+            resource = new NRF52##resourceType(NRF_##resourceType##instanceNumber, __VA_ARGS__);   \
+            resourceManager.registerResource(resourceType##instanceNumber, *resource);             \
+        }                                                                                          \
+        resource;                                                                                  \
+    })
+
+enum ResourceId
+{
+    PWM0,
+    PWM1,
+    PWM2,
+    PWM3,
+    RESOURCE_COUNT
+};
 
 namespace codal
 {
@@ -44,32 +67,11 @@ public:
      */
     static NRF52ResourceManager &get();
 
-    /*
-     * Request a PWM driver from the Resource Manager
-     *
-     * @param[in] source     The DataSource which will provide data to the PWM
-     * @param[in] pwm        (Optional) The desired pwm peripheral. If not specified, the resource
-     *                       manager will attempt to get the next available peripheral.
-     * @param[in] sampleRate The frequency (in Hz) at which data will be sampled
-     * @param[in] id         Device id used to identify events from this device on the message bus
-     *
-     * @return Either: - Pointer to a driver for the requested peripheral if successfully acquired
-     *                 - NULL if no peripheral could be acquired
-     */
-    NRF52PWM *pwmRequest(DataSource &source, NRF_PWM_Type *pwm = NULL,
-                         float const sampleRate = NRF52PWM_DEFAULT_FREQUENCY,
-                         uint16_t const id = DEVICE_ID_SYSTEM_DAC);
+    ErrorCode releaseResource(ResourceId);
 
-    /*
-     * Release a PWM driver back to the Resource Manager to be reused.
-     * This function will set `pwm` to NULL so the driver can no longer be used.
-     * If an invalid pointer is passed this function will do nothing.
-     *
-     * @param[in,out] pwm The driver to be released
-     *
-     * @return Enum representing the result of the release request
-     */
-    void pwmRelease(NRF52PWM *&pwm);
+    ErrorCode releaseResource(Resource &);
+
+    ErrorCode registerResource(ResourceId, Resource &);
 
 private:
     /*
@@ -80,7 +82,7 @@ private:
 
     static NRF52ResourceManager _resourceManager;
 
-    NRF52PWM *pwmDrivers[NRF52PWM_PWM_PERIPHERALS] = {NULL};
+    Resource *resourceTable[RESOURCE_COUNT];
 };
 } // namespace codal
 

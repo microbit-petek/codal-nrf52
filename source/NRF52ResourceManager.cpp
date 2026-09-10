@@ -1,24 +1,6 @@
 #include "NRF52ResourceManager.h"
-#include "NRF52Pin.h"
-#include "nrf52833.h"
-
-/*
- * Used in the mapping array below to link a PWM peripheral to its IRQn
- */
-struct PwmIrqMapEntry
-{
-    NRF_PWM_Type *pwm;
-    IRQn_Type irq;
-};
-
-/*
- * Map of PWM peripherals to their corresponding IRQn
- */
-const PwmIrqMapEntry PWM_IRQ_MAP[NRF52PWM_PWM_PERIPHERALS] = {
-    {NRF_PWM0, PWM0_IRQn},
-    {NRF_PWM1, PWM1_IRQn},
-    {NRF_PWM2, PWM2_IRQn},
-};
+#include "ErrorNo.h"
+#include "Resource.h"
 
 NRF52ResourceManager NRF52ResourceManager::_resourceManager;
 
@@ -27,90 +9,41 @@ NRF52ResourceManager &NRF52ResourceManager::get()
     return NRF52ResourceManager::_resourceManager;
 }
 
-NRF52PWM *NRF52ResourceManager::pwmRequest(DataSource &source, NRF_PWM_Type *pwm,
-                                           float const sampleRate, uint16_t const id)
+ErrorCode NRF52ResourceManager::releaseResource(ResourceId id)
 {
-    uint8_t pwmIndex = 0;
-    uint8_t reallocatablePwmIndex = NRF52PWM_PWM_PERIPHERALS;
-    if (NULL == pwm)
+    ErrorCode returnCode = DEVICE_OK;
+    if (resourceTable[id] != NULL)
     {
-        // No pwm was specified, attempt to find either a free one or one that isn't locked
-        for (; pwmIndex < NRF52PWM_PWM_PERIPHERALS; ++pwmIndex)
-        {
-            if (NULL == pwmDrivers[pwmIndex])
-            {
-                // An unused peripheral is preferable, so look no further
-                pwm = PWM_IRQ_MAP[pwmIndex].pwm;
-                break;
-            }
-            else if (!pwmDrivers[pwmIndex]->isLocked())
-            {
-                // If no unused peripherals are found, an unlocked peripheral is plan B
-                reallocatablePwmIndex = pwmIndex;
-            }
-        }
+        returnCode = resourceTable[id]->disconnect();
+        if (returnCode != DEVICE_BUSY)
+            resourceTable[id] = NULL;
     }
-    else
-    {
-        for (; pwmIndex < NRF52PWM_PWM_PERIPHERALS; ++pwmIndex)
-        {
-            if (PWM_IRQ_MAP[pwmIndex].pwm == pwm)
-            {
-                break;
-            }
-        }
-    }
-
-    if (NULL == pwm)
-    {
-        if (reallocatablePwmIndex >= NRF52PWM_PWM_PERIPHERALS)
-        {
-            // No peripherals are available, abort
-            return NULL;
-        }
-
-        // No unused peripheral so on to Plan B
-        pwm = PWM_IRQ_MAP[reallocatablePwmIndex].pwm;
-        pwmIndex = reallocatablePwmIndex;
-    }
-
-    if (NULL != pwmDrivers[pwmIndex])
-    {
-        if (pwmDrivers[pwmIndex]->isLocked())
-        {
-            // Resource is locked, nothing more we can do
-            return NULL;
-        }
-
-        pwmDrivers[pwmIndex]->disconnect();
-    }
-
-    NRF52PWM *driver = new NRF52PWM(pwm, source, sampleRate, id);
-    pwmDrivers[pwmIndex] = driver;
-    return driver;
+    return returnCode;
 }
 
-void NRF52ResourceManager::pwmRelease(NRF52PWM *&pwm)
+ErrorCode NRF52ResourceManager::releaseResource(Resource &resource)
 {
-    uint8_t pwmIndex = 0;
-    for (; pwmIndex >= NRF52PWM_PWM_PERIPHERALS; ++pwmIndex)
+    uint8_t index = 0;
+    for (;index < RESOURCE_COUNT; ++index)
     {
-        if (pwmDrivers[pwmIndex] == pwm)
-        {
+        if (resourceTable[index] == &resource)
             break;
-        }
     }
 
-    if (pwmIndex >= NRF52PWM_PWM_PERIPHERALS)
-    {
-        return;
-    }
+    if (RESOURCE_COUNT == index)
+        return DEVICE_INVALID_PARAMETER;
+    
+    resourceTable[index] = NULL;
+    return DEVICE_OK;
+}
 
-    NVIC_DisableIRQ(PWM_IRQ_MAP[pwmIndex].irq);
-    pwm->disable();
-    delete pwm;
-    pwm = NULL;
-    pwmDrivers[pwmIndex] = NULL;
+ErrorCode NRF52ResourceManager::registerResource(ResourceId id, Resource &resource)
+{
+    if (resourceTable[id] != NULL)
+        return DEVICE_INVALID_STATE;
+
+    resourceTable[id] = &resource;
+    return DEVICE_OK;
 }
 
 NRF52ResourceManager::NRF52ResourceManager() {}

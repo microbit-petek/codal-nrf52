@@ -1,7 +1,9 @@
 #include "NRF52PWM.h"
+#include "ErrorNo.h"
+#include "NRF52ResourceManager.h"
+#include "Pin.h"
 #include "ResourceConsumer.h"
-#include "nrf.h"
-#include "cmsis.h"
+#include "nrf52833_bitfields.h"
 
 using namespace codal;
 
@@ -32,7 +34,7 @@ void nrf52_pwm2_irq(void)
 // Handles on the instances of this class used the three PWM modules (if present)
 NRF52PWM* NRF52PWM::nrf52_pwm_driver[NRF52PWM_PWM_PERIPHERALS] = { NULL };
 
-NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, float sampleRate, uint16_t id) : PWM(*module), upstream(source)
+NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, ResourceConsumer &consumer, float sampleRate, uint16_t id) : Resource(consumer), PWM(*module), upstream(source)
 {
     // initialise state
     this->id = id;
@@ -396,25 +398,35 @@ int NRF52PWM::disconnectPin(Pin &pin)
     return releasePin(pin);
 }
 
-void NRF52PWM::connect(ResourceConsumer &consumer)
+ErrorCode NRF52PWM::connect(ResourceConsumer &consumer)
 {
-    if (this->consumer != &consumer)
+    ErrorCode returnCode = DEVICE_OK;
+    if (this->consumer != NULL && this->consumer != &consumer)
     {
-        if (this->consumer != NULL)
-        {
-            disconnect();
-            this->consumer = &consumer;
-        }
+        returnCode = disconnect();
     }
+
+    if (returnCode == DEVICE_OK)
+    {
+        this->consumer = &consumer;
+    }
+    return returnCode;
 }
 
-void NRF52PWM::disconnect()
+ErrorCode NRF52PWM::disconnect()
 {
-    if(consumer != NULL && !consumer->isResourceLocked())
+    ErrorCode returnCode = DEVICE_OK;
+    if(consumer != NULL) {
+        returnCode = consumer->releaseResource(*this);
+    }
+
+    if (DEVICE_BUSY != returnCode)
     {
         disable();
         upstream.disconnect();
-        consumer->releaseResource(*this);
         consumer = NULL;
-    }
+        NRF52ResourceManager::get().releaseResource(*this);
+        delete this;
+    }    
+    return returnCode;
 }
