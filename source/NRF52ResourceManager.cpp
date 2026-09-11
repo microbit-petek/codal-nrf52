@@ -2,9 +2,11 @@
 #include "ErrorNo.h"
 #include "Resource.h"
 
+using namespace resource_manager;
+
 NRF52ResourceManager NRF52ResourceManager::_resourceManager;
 
-NRF52ResourceManager &NRF52ResourceManager::get()
+NRF52ResourceManager &NRF52ResourceManager::_get()
 {
     return NRF52ResourceManager::_resourceManager;
 }

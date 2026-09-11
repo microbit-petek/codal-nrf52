@@ -425,7 +425,7 @@ ErrorCode NRF52PWM::disconnect()
         disable();
         upstream.disconnect();
         consumer = NULL;
-        NRF52ResourceManager::get().releaseResource(*this);
+        resource_manager::NRF52ResourceManager::_get().releaseResource(*this);
         delete this;
     }    
     return returnCode;

@@ -32,7 +32,8 @@ DEALINGS IN THE SOFTWARE.
 #define GET_RESOURCE(resourceType, instanceNumber, ...)                                            \
     ({                                                                                             \
         NRF52##resourceType *resource = NULL;                                                      \
-        NRF52ResourceManager &resourceManager = NRF52ResourceManager::get();                       \
+        resource_manager::NRF52ResourceManager &resourceManager =                                  \
+            resource_manager::NRF52ResourceManager::_get();                                        \
         if (DEVICE_BUSY != resourceManager.releaseResource(resourceType##instanceNumber))          \
         {                                                                                          \
             resource = new NRF52##resourceType(NRF_##resourceType##instanceNumber, __VA_ARGS__);   \
@@ -50,7 +51,7 @@ enum ResourceId
     RESOURCE_COUNT
 };
 
-namespace codal
+namespace resource_manager
 {
 
 class NRF52ResourceManager : public CodalComponent
@@ -65,7 +66,7 @@ public:
      *
      * @return reference to the Resource Manager instance
      */
-    static NRF52ResourceManager &get();
+    static NRF52ResourceManager &_get();
 
     ErrorCode releaseResource(ResourceId);
 
@@ -84,6 +85,6 @@ private:
 
     Resource *resourceTable[RESOURCE_COUNT];
 };
-} // namespace codal
+} // namespace resource_manager
 
 #endif // #ifndef NRF52_RESOURCE_MANAGER
