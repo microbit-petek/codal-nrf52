@@ -29,6 +29,15 @@ DEALINGS IN THE SOFTWARE.
 #include "NRF52PWM.h"
 #include "Resource.h"
 
+/**
+ * This is the method by which a resource is obtained. The resource type and instance are specified,
+ * followed by the parameters required to instantiate the resource driver. For example:
+ *
+ * NRF52PWM * pwm0 = GET_RESOURCE(PWM, 0, *dataSource, *consumer, 44100);
+ *
+ * So long as the resource is not locked by another consumer, the resource will be configured and
+ * a pointer to the driver will be returned. Otherwise, the pointer will be NULL.
+ */
 #define GET_RESOURCE(resourceType, instanceNumber, ...)                                            \
     ({                                                                                             \
         NRF52##resourceType *resource = NULL;                                                      \
@@ -58,20 +67,47 @@ class NRF52ResourceManager : public CodalComponent
 {
 public:
     /*
-     * The Resource Manager manages access to the hardware peripherals, making sure that each
-     * peripheral is only being used by one component at a time, and allowing dynamic reallocation
-     * of peripherals when they're no longer required.
-     * The resource manager exists as a static variable.
-     * This function provides access to it through a reference.
+     * The resource manager keeps track of which resources are in use, allowing for dynamic
+     * reassignment. The resource manager (and this function) are not designed to be called
+     * directly, instead use the GET_RESOURCE() macro to facilitate aquisition of resources.
      *
      * @return reference to the Resource Manager instance
      */
     static NRF52ResourceManager &_get();
 
+    /**
+     * Releases a resource based on its ID. This is used by the GET_RESOURCE() macro to signal that
+     * a resource has been requested. The resource manager acts as a lookup, matching the ID to the
+     * current instance of the resource's driver (if it exists) and facilitates the disconnection if
+     * the resource is not locked.
+     *
+     * @param[in] id The ID of the resource to be released
+     *
+     * @return DEVICE_OK if the resource is now free
+     *         DEVICE_BUSY if the resource is locked
+     *         DEVICE_INVALID_PARAMETER if the resource was linked to the wrong consumer
+     */
     ErrorCode releaseResource(ResourceId);
 
+    /**
+     * Releases a resource based on its reference. This is used when the releasing of a resource is triggered by its consumer. This function could be combined with the one above if the Resource type was modified to hold its ID, passed in on construction. However, this would mean that all resource constructors would need another ID field, which didn't seem like a good solution.
+     *
+     * @param[in] resource Reference to the resource being released
+     *
+     * @return DEVICE_OK if the resource is now free
+     *         DEVICE_INVALID_PARAMETER if the resource does not appear in the resource manager's table
+     */
     ErrorCode releaseResource(Resource &);
 
+    /**
+     * Registers a resource with the resource manager.
+     *
+     * @param[in] id The ID of the resource being registered
+     * @param[in] resource Reference to the resource being registered
+     *
+     * @return DEVICE_OK if the resource was successfully registered
+     *         DEVICE_INVALID_STATE if a resource is already registered to that ID
+     */
     ErrorCode registerResource(ResourceId, Resource &);
 
 private:
