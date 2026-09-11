@@ -1,6 +1,9 @@
 #include "NRF52PWM.h"
-#include "nrf.h"
-#include "cmsis.h"
+#include "ErrorNo.h"
+#include "Pin.h"
+#include "ResourceConsumer.h"
+#include "nrf52833.h"
+#include "nrf52833_bitfields.h"
 
 using namespace codal;
 
@@ -31,7 +34,7 @@ void nrf52_pwm2_irq(void)
 // Handles on the instances of this class used the three PWM modules (if present)
 NRF52PWM* NRF52PWM::nrf52_pwm_driver[NRF52PWM_PWM_PERIPHERALS] = { NULL };
 
-NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, float sampleRate, uint16_t id) : PWM(*module), upstream(source)
+NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, ResourceConsumer &consumer, float sampleRate, uint16_t id) : Resource(consumer), PWM(*module), upstream(source)
 {
     // initialise state
     this->id = id;
@@ -76,6 +79,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, float sampleRate, u
         NVIC_SetVector( PWM0_IRQn, (uint32_t) nrf52_pwm0_irq );
         NVIC_ClearPendingIRQ(PWM0_IRQn);
         NVIC_EnableIRQ(PWM0_IRQn);
+        irqNumber = PWM0_IRQn;
     }
 
     if (&PWM == NRF_PWM1)
@@ -84,6 +88,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, float sampleRate, u
         NVIC_SetVector( PWM1_IRQn, (uint32_t) nrf52_pwm1_irq );
         NVIC_ClearPendingIRQ(PWM1_IRQn);
         NVIC_EnableIRQ(PWM1_IRQn);
+        irqNumber = PWM1_IRQn;
     }
 
     if (&PWM == NRF_PWM2)
@@ -92,6 +97,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, float sampleRate, u
         NVIC_SetVector( PWM2_IRQn, (uint32_t) nrf52_pwm2_irq );
         NVIC_ClearPendingIRQ(PWM2_IRQn);
         NVIC_EnableIRQ(PWM2_IRQn);
+        irqNumber = PWM2_IRQn;
     }
 
     // Enable the PWM module
@@ -334,6 +340,7 @@ void NRF52PWM::irq()
  */
 void NRF52PWM::enable()
 {
+    NVIC_EnableIRQ(irqNumber);
     enabled = true;
     PWM.ENABLE = 1;
 }
@@ -343,6 +350,8 @@ void NRF52PWM::enable()
  */
 void NRF52PWM::disable()
 {
+    NVIC_DisableIRQ(irqNumber);
+    NVIC_ClearPendingIRQ(irqNumber);
     enabled = false;
     PWM.ENABLE = 0;
 }
@@ -393,4 +402,24 @@ NRF52PWM::releasePin(Pin &pin)
 int NRF52PWM::disconnectPin(Pin &pin)
 {
     return releasePin(pin);
+}
+
+ErrorCode NRF52PWM::_disconnect()
+{
+    ErrorCode returnCode = DEVICE_OK;
+    if(consumer != NULL) {
+        returnCode = consumer->releaseResource(*this);
+    }
+
+    if (DEVICE_BUSY != returnCode)
+    {
+        consumer = NULL;
+    }    
+    return returnCode;
+}
+
+NRF52PWM::~NRF52PWM()
+{
+    disable();
+    upstream.disconnect();
 }

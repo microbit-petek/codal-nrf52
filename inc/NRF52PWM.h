@@ -1,9 +1,10 @@
 #include "CodalConfig.h"
-#include "codal-core/inc/types/Event.h"
-#include "Timer.h"
-#include "NRF52Pin.h"
+#include "ErrorNo.h"
+#include "PinPeripheral.h"
+#include "ResourceConsumer.h"
 #include "DataStream.h"
-#include "nrf.h"
+#include "Resource.h"
+#include "nrf52833.h"
 
 #ifndef NRF52PWM_H
 #define NRF52PWM_H
@@ -24,7 +25,7 @@ using namespace codal;
 
 namespace codal
 {
-class NRF52PWM : public CodalComponent, public DataSink, public PinPeripheral
+class NRF52PWM : public CodalComponent, public DataSink, public PinPeripheral, public Resource
 {
 
 private:
@@ -57,7 +58,8 @@ public:
       * @param sampleRate The frequency (in Hz) that data will be presented.
       * @param id The id to use for the message bus when transmitting events.
       */
-    NRF52PWM(NRF_PWM_Type *module, DataSource &source, float sampleRate = NRF52PWM_DEFAULT_FREQUENCY, uint16_t id = DEVICE_ID_SYSTEM_DAC);
+    NRF52PWM(NRF_PWM_Type *module, DataSource &source, ResourceConsumer &consumer,
+             float sampleRate = NRF52PWM_DEFAULT_FREQUENCY, uint16_t id = DEVICE_ID_SYSTEM_DAC);
 
     /**
      * Callback provided when data is ready.
@@ -152,7 +154,14 @@ public:
     // Backward compat - deprecated.
     int disconnectPin(Pin &pin);
 
-    private:
+    ErrorCode _disconnect() override;
+
+    ~NRF52PWM() override;
+
+private:
+
+    IRQn_Type irqNumber;
+    
     /**
      * Pull a buffer into the given double buffer slot, if one is available.
      */
