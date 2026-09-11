@@ -51,6 +51,10 @@ DEALINGS IN THE SOFTWARE.
         resource;                                                                                  \
     })
 
+#define RELEASE_RESOURCE(resource)                                                                 \
+    resource_manager::NRF52ResourceManager::_get().releaseResource(resource);                      \
+    resource = NULL;
+
 enum ResourceId
 {
     PWM0,
@@ -90,14 +94,19 @@ public:
     ErrorCode releaseResource(ResourceId);
 
     /**
-     * Releases a resource based on its reference. This is used when the releasing of a resource is triggered by its consumer. This function could be combined with the one above if the Resource type was modified to hold its ID, passed in on construction. However, this would mean that all resource constructors would need another ID field, which didn't seem like a good solution.
+     * Releases a resource based on its reference. This is used when the releasing of a resource is
+     * triggered by its consumer. This function could be combined with the one above if the Resource
+     * type was modified to hold its ID, passed in on construction. However, this would mean that
+     * all resource constructors would need another ID field, which didn't seem like a good
+     * solution.
      *
      * @param[in] resource Reference to the resource being released
      *
      * @return DEVICE_OK if the resource is now free
-     *         DEVICE_INVALID_PARAMETER if the resource does not appear in the resource manager's table
+     *         DEVICE_INVALID_PARAMETER if the resource does not appear in the resource manager's
+     * table
      */
-    ErrorCode releaseResource(Resource &);
+    ErrorCode releaseResource(Resource *);
 
     /**
      * Registers a resource with the resource manager.

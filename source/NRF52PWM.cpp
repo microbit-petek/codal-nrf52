@@ -1,8 +1,8 @@
 #include "NRF52PWM.h"
 #include "ErrorNo.h"
-#include "NRF52ResourceManager.h"
 #include "Pin.h"
 #include "ResourceConsumer.h"
+#include "nrf52833.h"
 #include "nrf52833_bitfields.h"
 
 using namespace codal;
@@ -79,6 +79,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, ResourceConsumer &c
         NVIC_SetVector( PWM0_IRQn, (uint32_t) nrf52_pwm0_irq );
         NVIC_ClearPendingIRQ(PWM0_IRQn);
         NVIC_EnableIRQ(PWM0_IRQn);
+        irqNumber = PWM0_IRQn;
     }
 
     if (&PWM == NRF_PWM1)
@@ -87,6 +88,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, ResourceConsumer &c
         NVIC_SetVector( PWM1_IRQn, (uint32_t) nrf52_pwm1_irq );
         NVIC_ClearPendingIRQ(PWM1_IRQn);
         NVIC_EnableIRQ(PWM1_IRQn);
+        irqNumber = PWM1_IRQn;
     }
 
     if (&PWM == NRF_PWM2)
@@ -95,6 +97,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, ResourceConsumer &c
         NVIC_SetVector( PWM2_IRQn, (uint32_t) nrf52_pwm2_irq );
         NVIC_ClearPendingIRQ(PWM2_IRQn);
         NVIC_EnableIRQ(PWM2_IRQn);
+        irqNumber = PWM2_IRQn;
     }
 
     // Enable the PWM module
@@ -337,6 +340,7 @@ void NRF52PWM::irq()
  */
 void NRF52PWM::enable()
 {
+    NVIC_EnableIRQ(irqNumber);
     enabled = true;
     PWM.ENABLE = 1;
 }
@@ -346,6 +350,8 @@ void NRF52PWM::enable()
  */
 void NRF52PWM::disable()
 {
+    NVIC_DisableIRQ(irqNumber);
+    NVIC_ClearPendingIRQ(irqNumber);
     enabled = false;
     PWM.ENABLE = 0;
 }
@@ -398,22 +404,7 @@ int NRF52PWM::disconnectPin(Pin &pin)
     return releasePin(pin);
 }
 
-ErrorCode NRF52PWM::connect(ResourceConsumer &consumer)
-{
-    ErrorCode returnCode = DEVICE_OK;
-    if (this->consumer != NULL && this->consumer != &consumer)
-    {
-        returnCode = disconnect();
-    }
-
-    if (returnCode == DEVICE_OK)
-    {
-        this->consumer = &consumer;
-    }
-    return returnCode;
-}
-
-ErrorCode NRF52PWM::disconnect()
+ErrorCode NRF52PWM::_disconnect()
 {
     ErrorCode returnCode = DEVICE_OK;
     if(consumer != NULL) {
@@ -422,11 +413,13 @@ ErrorCode NRF52PWM::disconnect()
 
     if (DEVICE_BUSY != returnCode)
     {
-        disable();
-        upstream.disconnect();
         consumer = NULL;
-        resource_manager::NRF52ResourceManager::_get().releaseResource(*this);
-        delete this;
     }    
     return returnCode;
+}
+
+NRF52PWM::~NRF52PWM()
+{
+    disable();
+    upstream.disconnect();
 }

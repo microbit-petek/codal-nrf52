@@ -2,11 +2,9 @@
 #include "ErrorNo.h"
 #include "PinPeripheral.h"
 #include "ResourceConsumer.h"
-#include "codal-core/inc/types/Event.h"
-#include "Timer.h"
 #include "DataStream.h"
-#include "nrf.h"
 #include "Resource.h"
+#include "nrf52833.h"
 
 #ifndef NRF52PWM_H
 #define NRF52PWM_H
@@ -156,11 +154,14 @@ public:
     // Backward compat - deprecated.
     int disconnectPin(Pin &pin);
 
-    ErrorCode connect(ResourceConsumer &consumer) override;
+    ErrorCode _disconnect() override;
 
-    ErrorCode disconnect() override;
+    ~NRF52PWM() override;
 
 private:
+
+    IRQn_Type irqNumber;
+    
     /**
      * Pull a buffer into the given double buffer slot, if one is available.
      */

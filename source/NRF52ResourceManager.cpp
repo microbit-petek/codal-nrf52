@@ -14,27 +14,32 @@ NRF52ResourceManager &NRF52ResourceManager::_get()
 ErrorCode NRF52ResourceManager::releaseResource(ResourceId id)
 {
     ErrorCode returnCode = DEVICE_OK;
-    if (resourceTable[id] != NULL)
+    Resource *const resource = resourceTable[id];
+    if (resource != NULL)
     {
-        returnCode = resourceTable[id]->disconnect();
+        returnCode = resource->_disconnect();
         if (returnCode != DEVICE_BUSY)
+        {
+            delete resource;
             resourceTable[id] = NULL;
+        }
     }
     return returnCode;
 }
 
-ErrorCode NRF52ResourceManager::releaseResource(Resource &resource)
+ErrorCode NRF52ResourceManager::releaseResource(Resource *resource)
 {
     uint8_t index = 0;
-    for (;index < RESOURCE_COUNT; ++index)
+    for (; index < RESOURCE_COUNT; ++index)
     {
-        if (resourceTable[index] == &resource)
+        if (resourceTable[index] == resource)
             break;
     }
 
     if (RESOURCE_COUNT == index)
         return DEVICE_INVALID_PARAMETER;
-    
+
+    delete resource;
     resourceTable[index] = NULL;
     return DEVICE_OK;
 }
