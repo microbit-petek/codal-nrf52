@@ -51,6 +51,10 @@ DEALINGS IN THE SOFTWARE.
         resource;                                                                                  \
     })
 
+/**
+ * This macro is called by a resource consumer wishing to release a resource it holds. The passed
+ * pointer is set to NULL so that the released memory is no longer accessible.
+ */
 #define RELEASE_RESOURCE(resource)                                                                 \
     resource_manager::NRF52ResourceManager::_get().releaseResource(resource);                      \
     resource = NULL;
@@ -94,11 +98,8 @@ public:
     ErrorCode releaseResource(ResourceId);
 
     /**
-     * Releases a resource based on its reference. This is used when the releasing of a resource is
-     * triggered by its consumer. This function could be combined with the one above if the Resource
-     * type was modified to hold its ID, passed in on construction. However, this would mean that
-     * all resource constructors would need another ID field, which didn't seem like a good
-     * solution.
+     * Releases a resource based on its reference. This is used by the RELEASE_RESOURCE() macro to
+     * signal that a resource consumer is releasing a resource it holds.
      *
      * @param[in] resource Reference to the resource being released
      *
